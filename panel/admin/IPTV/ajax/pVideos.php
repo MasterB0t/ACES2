@@ -218,7 +218,8 @@ try {
                 throw new \Exception("Another process is still running.");
 
 
-            $Process = \ACES2\Process::add('iptv.remove_video_reports', 1, 'Removing video reports.');
+            $Process = \ACES2\Process::add('iptv.remove_video_reports', 1,  0,
+                'Removing video reports.');
             setAjaxComplete('',false);
 
             if($_REQUEST['ids'] == 'all' ) {
