@@ -373,7 +373,7 @@ class Server {
         if($VER == 18 ) {
            run(" apt -y install  libonig4 libwebp6 libjpeg8 libxpm4 libonig-dev libzip-dev libssl-dev libwebp-dev libjpeg-dev libonig-dev libzip5 libssh2-1  ");
         } else if($VER == 20 ) {
-            run(" apt -y install libonig5 libssh2-1-dev");
+            run(" apt -y install libonig5 libssh2-1-dev libzip-dev");
         } else if ($VER == 22 ) {
             run("apt -y install libzip4t64 libavif16 libonig5 libssh2-1");
         } else if ($VER == 24 ) {
