@@ -1,0 +1,2 @@
+<?php
+Redirect('login.php');

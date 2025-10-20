@@ -1,0 +1,9 @@
+<?php
+
+namespace ACES2\IPTV;
+
+class Process  extends \ACES2\Process {
+    const TYPE_REMOVE_VIDEO_REPORTS = 'IPTV.REMOVE_VIDEO_REPORTS';
+    const TYPE_CHECK_VIDEOS = 'IPTV.CHECK_VIDEOS';
+    const TYPE_UPDATE_PROVIDER_CONTENT = 'IPTV.UPDATE_PROVIDER_CONTENT';
+}
