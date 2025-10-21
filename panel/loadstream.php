@@ -158,7 +158,8 @@ if($DEVICE = $r->fetch_assoc()) {
 
 $DEVICE['bouquets'] = join("','", unserialize($DEVICE['bouquets']) );
 
-$r = $ACES->query("SELECT  c.enable,c.ondemand,c.stream,c.stream_server,c.name,cat.adults FROM iptv_channels_in_bouquet p 
+$r = $ACES->query("SELECT  c.enable,c.ondemand,c.stream,c.stream_server,c.name,cat.adults 
+FROM iptv_channels_in_bouquet p 
 		INNER JOIN iptv_channels c ON (c.id = p.chan_id) 
 		INNER JOIN iptv_stream_categories cat ON ( cat.id = c.category_id)
 		WHERE p.bouquet_id IN ('{$DEVICE['bouquets']}') AND $strm_id = p.chan_id

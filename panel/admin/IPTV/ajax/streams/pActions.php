@@ -216,12 +216,16 @@ try {
             break;
 
         case 'stream_set_load_balance':
+
             if(!$ADMIN->hasPermission(\ACES2\IPTV\AdminPermissions::IPTV_FULL_STREAMS))
                 throw new \ACES2\Exception(\ACES2\ERRORS::NO_PRIVILEGES);
 
             $streams = explode(",",$_POST['stream_ids']);
 
-            $Server = new \ACES2\IPTV\Server((int)$_REQUEST['main_server']);
+            $Server = new \ACES2\IPTV\Server((int)$_REQUEST['primary_server']);
+            $no_clients_on_primary_server = (bool)!empty($_REQUEST['no_clients_on_primary_server']);
+
+            $db = new \ACES2\DB;
 
             foreach($streams as $stream) {
                 $Stream = new \ACES2\IPTV\Stream((int)$stream);
@@ -229,6 +233,9 @@ try {
                     $Stream->setServerId($Server->id, false); //WE NEED TO RESTART STREAM AFTER SETTINGS LBS
                     $restart_stream = (bool)$Stream->getStatus() != \ACES2\IPTV\Stream::STATUS_STOPPED;
                 }
+
+                $Stream->setNoClientsOnPrimaryServer($no_clients_on_primary_server);
+                $Stream->save();
 
                 //ALWAYS RESET LBS.
                 foreach($Stream->load_balances as $load_balance ) {

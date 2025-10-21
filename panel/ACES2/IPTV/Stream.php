@@ -46,6 +46,7 @@ class Stream
     public $auto_update_name = 0;
     public $status = 0;
     public $source_type = 0;
+    public $no_clients_on_primary_server = false;
 
     public function __construct(int $stream_id = null) {
 
@@ -73,6 +74,7 @@ class Stream
         $this->ondemand = $row['ondemand'];
         $this->catchup_exp_days = $row['catchup_expire_days'];
         $this->source_type = $row['source_type'];
+        $this->no_clients_on_primary_server = (bool)$row['no_clients_on_primary_server'];
 
         $r=$db->query("SELECT source_server as source , destination_server as destination 
                             FROM iptv_channels_in_lb WHERE channel_id = $this->id ");
@@ -141,6 +143,7 @@ class Stream
             throw new \Exception("Category #$category_id do not exist.");
         $this->category_id = $category_id;
     }
+
     public function setServerID(int $server_id, bool $restart_stream = true ) : void {
 
         if($this->server_id == $server_id)
@@ -208,6 +211,10 @@ class Stream
         }
     }
 
+    public function setNoClientsOnPrimaryServer(bool $no_clients_on_primary_server) : void {
+        $this->no_clients_on_primary_server = $no_clients_on_primary_server;
+    }
+
     public function restart()  {
 
         session_write_close();
@@ -220,7 +227,10 @@ class Stream
         if (!$this->stream) //IF NOT SET TO STREAM NOTHING MORE TO DO...
             return;
 
-        $no_client = (count($this->load_balances) > 0) ? 1 : 0 ;
+        //$no_client = (count($this->load_balances) > 0) ? 1 : 0 ;
+        if(count($this->load_balances)> 0 ) {
+            $no_client = $this->no_clients_on_primary_server;
+        }
 
         $time = time();
 
@@ -461,9 +471,9 @@ class Stream
         $type = self::CHANNEL_TYPE_STREAM;
 
         $db->query("INSERT INTO iptv_channels ( type, name, tvg_id, category_id, 
-                        stream, ondemand, stream_server, stream_profile, enable, ordering, number)
+                        stream, ondemand, stream_server, stream_profile, enable, ordering, number, no_clients_on_primary_server)
             VALUES('$type', '$name', '$tvg_id', '$stream->category_id', '$stream->stream', '$stream->ondemand', 
-                   '$stream->server_id', '$stream->stream_profile_id', 1, $ordering, $number);
+                   '$stream->server_id', '$stream->stream_profile_id', 1, $ordering, $number, '$stream->no_clients_on_primary_server');
         ");
 
         return new self($db->insert_id);
@@ -478,7 +488,7 @@ class Stream
         $db->query("UPDATE iptv_channels SET name = '$this->name', stream_server = '$this->server_id', 
                              stream_profile = '$this->stream_profile_id', category_id = '$this->category_id', tvg_id = '$tvg_id',
                              ondemand = '$this->ondemand', stream = '$this->stream', enable = '$this->enabled', event_id = '$this->event_id',
-                             type = '$this->type'
+                             type = '$this->type', no_clients_on_primary_server = '$this->no_clients_on_primary_server'
                 WHERE id = '$this->id'
         ");
     }
@@ -668,4 +678,4 @@ class Stream
 
     }
 
-}?>
+}

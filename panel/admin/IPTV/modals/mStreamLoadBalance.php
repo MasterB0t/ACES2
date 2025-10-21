@@ -20,6 +20,7 @@ $selected_main = 0;
 $LoadBalances = [];
 
 if(count($ids) == 1 ) {
+
     $Stream = new \ACES2\IPTV\Stream((int)$ids[0]);
 
     $LBS = [];
@@ -59,8 +60,8 @@ $d = 1;
     <div class="modal-body">
 
         <div class="form-group">
-            <label>Main Server</label>
-            <select name="main_server" form="formModal" class="form-control select2">
+            <label>Primary Server</label>
+            <select name="primary_server" form="formModal" class="form-control select2">
                 <option value="">Select One</option>
                 <?php foreach ($Servers as $server) {
                     $selected = $selected_main == $server['id'] ? 'selected' : '';
@@ -70,12 +71,17 @@ $d = 1;
             </select>
         </div>
 
-        <div class="form-group-bs">
-            <label for="swtNoClient">No Client on Main Server</label>
-            <input id="swtNoClient" type="checkbox" class="bs-switch" name="no_client_main_server"
-               data-on-text="Yes"
-               data-off-text="No Clients"
-            />
+        <div class="form-group clearfix">
+            <div class="icheck-primary d-inline">
+                <input name="no_clients_on_primary_server"
+                       <?php if(count($ids) == 1 ) {
+                           echo $Stream->no_clients_on_primary_server ? 'checked' : '';
+                       } ?>
+                       type="checkbox" id="chkNoClientOnPrimaryServer" >
+                <label for="chkNoClientOnPrimaryServer">
+                    No Clients On Primary Server
+                </label>
+            </div>
         </div>
 
         <div class="divLbs pt-3">
