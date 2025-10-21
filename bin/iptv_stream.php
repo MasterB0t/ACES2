@@ -74,6 +74,22 @@ function reconnect() {
     }
 }
 
+$r=$DB->query("SELECT value FROM settings WHERE name = 'iptv.stream_encrypted' ");
+$ENCRYPT_STREAM = (bool)$r->fetch_assoc()['value'] == 1 ;
+$ENCRYPT_STREAM = false;
+if($ENCRYPT_STREAM) {
+    $ENCRYPT_KEY_URL = 'http://aces-iptv.ddns.net/enc.key';
+    //WRITING KEY FILE
+    $ENCRYPT_KEY_FILE = "/home/aces/tmp/keyfile{$StreamID}.txt";
+    $ENCRYPT_IV = 'ecd0d06eaf884d8226c33928e87efa33' ;
+    $ENCRYPT_KEY_HEX = exec("hexdump -e '16/1 \"%02x\"'  /home/aces/panel/enc.key "); //44734d58301d84dc579bac2a38b07be7
+    $fp = fopen($ENCRYPT_KEY_FILE, 'w');
+    fwrite($fp, $ENCRYPT_STREAM."\n");
+    fwrite($fp, "/home/aces/panel/enc.key\n");
+    fwrite($fp, "$ENCRYPT_IV");
+    fclose($fp);
+
+}
 
 $r=$DB->query("SELECT value FROM settings WHERE name = 'iptv.stream_logs' ");
 $LOG_LEVEL=(int)$r->fetch_assoc()['value'];
@@ -188,16 +204,67 @@ if($stream_opt['skip_no_video']) $maps .= " -map v ";
 $timeout=(int)$stream_opt['timeout'];
 
 
-$COMMAND = "ffmpeg -y -loglevel %{log} -nostdin -nostats -hide_banner -err_detect ignore_err $pre_opt $user_agent $probesize $analyzeduration $pre_args %{headers} %{input} $post_args -sc_threshold 0 $adaptive -c:v {$stream_opt['video_codec']} -c:a {$stream_opt['audio_codec']} $maps $video_bitrate $audio_bitrate $screen_size $frameate $threads $preset %{loader_post_argvs} -f segment -segment_format mpegts -segment_time 10 -segment_list_size 6 -segment_format_options mpegts_flags=+initial_discontinuity:mpegts_copyts=1 -segment_list_type m3u8 -segment_list_flags +live  -segment_list %{list} %{file} ";
+$COMMAND = "ffmpeg -y -loglevel %{log} -nostdin -nostats -hide_banner -err_detect ignore_err $pre_opt $user_agent $probesize ";
+$COMMAND .= " $analyzeduration $pre_args %{headers} %{input} $post_args -sc_threshold 0 $adaptive ";
+$COMMAND .= " -c:v {$stream_opt['video_codec']} -c:a {$stream_opt['audio_codec']} $maps $video_bitrate ";
+$COMMAND .= " $audio_bitrate $screen_size $frameate $threads $preset %{loader_post_argvs} ";
+
+if($ENCRYPT_STREAM) {
+    $COMMAND .= " -f hls -hls_time 9 -hls_segment_type mpegts -hls_list_size 6 ";
+    $COMMAND .= " -hls_key_info_file $ENCRYPT_KEY_FILE ";
+    $COMMAND .= " -hls_segment_filename %{file} %{list}  ";
+} else {
+    $COMMAND .= " -f segment -segment_format mpegts -segment_time 10 -segment_list_size 6 ";
+    $COMMAND .= " -segment_format_options mpegts_flags=+initial_discontinuity:mpegts_copyts=1 ";
+    $COMMAND .= " -segment_list_type m3u8 -segment_list_flags +live -segment_list %{list} %{file} ";
+}
 
 
 logfile("PROCESS START");
+
 $StreamStats = new StreamStats($StreamID, $SERVER_ID);
 
 function killFFMPEG() {
     global $StreamID;
     exec("ps -eAf  | grep /stream_tmp/{$StreamID}- | grep ffmpeg | grep -v 'ps -eAf'  | awk '{print $2 }' ",$ff_pids);
     foreach($ff_pids as $fpid) exec("kill -9 $fpid");
+}
+function probeFFMPEG($chunk) {
+
+    global $StreamID, $DB, $STREAMING_ID, $ENCRYPT_STREAM, $ENCRYPT_KEY_HEX, $ENCRYPT_IV;
+
+    $chk_file = "/home/aces/stream_tmp/$chunk";
+
+    $pre_cmd = '';
+    if($ENCRYPT_STREAM) {
+        $pre_cmd = " openssl aes-128-cbc -d -K $ENCRYPT_KEY_HEX -iv $ENCRYPT_IV -nosalt -in ";
+        $pre_cmd .= " $chk_file -out - | ";
+        $chk_file = " - ";
+    }
+
+    $stream_v_info = json_decode(shell_exec( "$pre_cmd  ffprobe -v quiet -select_streams v -print_format json -show_entries stream=width,height,codec_name,r_frame_rate $chk_file " ),true);
+    $stream_a_info = json_decode(shell_exec( "$pre_cmd ffprobe -v quiet -select_streams a -print_format json -show_entries stream=codec_name $chk_file " ),true);
+    $bitrate = (int) shell_exec( "$pre_cmd ffprobe -v quiet  -print_format json -show_entries format=bit_rate -of default=noprint_wrappers=1:nokey=1  $chk_file  " );
+
+    $s_info = array();
+    $s_info['video_codec'] = $stream_v_info['streams'][0]['codec_name'];
+    $s_info['audio_codec'] = $stream_a_info['streams'][0]['codec_name'];
+    $s_info['resolution'] = "{$stream_v_info['streams'][0]['width']}x{$stream_v_info['streams'][0]['height']}";
+    try {
+        $s_info['frames'] = round( (int) explode( '/', $stream_v_info['streams'][0]['r_frame_rate'] )[0] /
+            explode( '/', $stream_v_info['streams'][0]['r_frame_rate'] )[1],0) ;
+    } catch (DivisionByZeroError $exp ) {
+        $s_info['frames'] = 0;
+    }
+
+    $frames = (int)$s_info['frames'];
+    $s_info = serialize($s_info);
+
+    $DB->query("UPDATE iptv_streaming SET status = 1, source_id = '{$s['id']}', connection_speed = 1,
+                      video_codec = '{$stream_v_info['streams'][0]['codec_name']}', audio_codec = '{$stream_a_info['streams'][0]['codec_name']}', 
+                      `bitrate` = '$bitrate', fps='$frames', info = '$s_info', reconnected = reconnected + 1, connected_datetime=NOW() 
+                  WHERE id=$STREAMING_ID ");
+
 }
 
 function clearOldChunks() {
@@ -552,33 +619,39 @@ while(true) {
 
             if(!empty($chunk)) {
 
-                //$stream_v_info = json_decode(shell_exec(" ffprobe -v quiet -select_streams v -print_format json -show_entries stream=width,height,codec_name,r_frame_rate /home/aces/stream_tmp/$chunk ",true));
-                $stream_v_info = json_decode(shell_exec( " ffprobe -v quiet -select_streams v -print_format json -show_entries stream=width,height,codec_name,r_frame_rate /home/aces/stream_tmp/$chunk " ),true);
-                $stream_a_info = json_decode(shell_exec( " ffprobe -v quiet -select_streams a -print_format json -show_entries stream=codec_name /home/aces/stream_tmp/$chunk " ),true);
-                $bitrate = (int) shell_exec( "ffprobe -v quiet  -print_format json -show_entries format=bit_rate -of default=noprint_wrappers=1:nokey=1  /home/aces/stream_tmp/$chunk  " );
+                probeFFMPEG($chunk);
 
-                $s_info = array();
-                $s_info['video_codec'] = $stream_v_info['streams'][0]['codec_name'];
-                $s_info['audio_codec'] = $stream_a_info['streams'][0]['codec_name'];
-                $s_info['resolution'] = "{$stream_v_info['streams'][0]['width']}x{$stream_v_info['streams'][0]['height']}";
-                try {
-                    $s_info['frames'] = round( (int) explode( '/', $stream_v_info['streams'][0]['r_frame_rate'] )[0] /
-                        explode( '/', $stream_v_info['streams'][0]['r_frame_rate'] )[1],0) ;
-                } catch (DivisionByZeroError $exp ) {
-                    $s_info['frames'] = 0;
-                }
-
-                $frames = (int)$s_info['frames'];
-                $s_info = serialize($s_info);
+//                //$stream_v_info = json_decode(shell_exec(" ffprobe -v quiet -select_streams v -print_format json -show_entries stream=width,height,codec_name,r_frame_rate /home/aces/stream_tmp/$chunk ",true));
+//                $stream_v_info = json_decode(shell_exec( " ffprobe -v quiet -select_streams v -print_format json -show_entries stream=width,height,codec_name,r_frame_rate /home/aces/stream_tmp/$chunk " ),true);
+//                $stream_a_info = json_decode(shell_exec( " ffprobe -v quiet -select_streams a -print_format json -show_entries stream=codec_name /home/aces/stream_tmp/$chunk " ),true);
+//                $bitrate = (int) shell_exec( "ffprobe -v quiet  -print_format json -show_entries format=bit_rate -of default=noprint_wrappers=1:nokey=1  /home/aces/stream_tmp/$chunk  " );
+//
+//                $s_info = array();
+//                $s_info['video_codec'] = $stream_v_info['streams'][0]['codec_name'];
+//                $s_info['audio_codec'] = $stream_a_info['streams'][0]['codec_name'];
+//                $s_info['resolution'] = "{$stream_v_info['streams'][0]['width']}x{$stream_v_info['streams'][0]['height']}";
+//                try {
+//                    $s_info['frames'] = round( (int) explode( '/', $stream_v_info['streams'][0]['r_frame_rate'] )[0] /
+//                        explode( '/', $stream_v_info['streams'][0]['r_frame_rate'] )[1],0) ;
+//                } catch (DivisionByZeroError $exp ) {
+//                    $s_info['frames'] = 0;
+//                }
+//
+//                $frames = (int)$s_info['frames'];
+//                $s_info = serialize($s_info);
+//
+//                //RESET DOWNTIME;
+//                $DB->query("UPDATE iptv_channels set down_since = 0 WHERE id = $StreamID ");
+//                $DOWN_TIME=0;
+//
+//                $DB->query("UPDATE iptv_streaming SET status = 1, source_id = '{$s['id']}', connection_speed = 1,
+//                      video_codec = '{$stream_v_info['streams'][0]['codec_name']}', audio_codec = '{$stream_a_info['streams'][0]['codec_name']}',
+//                      `bitrate` = '$bitrate', fps='$frames', info = '$s_info', reconnected = reconnected + 1, connected_datetime=NOW()
+//                  WHERE id=$STREAMING_ID ");
 
                 //RESET DOWNTIME;
                 $DB->query("UPDATE iptv_channels set down_since = 0 WHERE id = $StreamID ");
                 $DOWN_TIME=0;
-
-                $DB->query("UPDATE iptv_streaming SET status = 1, source_id = '{$s['id']}', connection_speed = 1,
-                      video_codec = '{$stream_v_info['streams'][0]['codec_name']}', audio_codec = '{$stream_a_info['streams'][0]['codec_name']}', 
-                      `bitrate` = '$bitrate', fps='$frames', info = '$s_info', reconnected = reconnected + 1, connected_datetime=NOW() 
-                  WHERE id=$STREAMING_ID ");
 
                 logfile("CONNECTED $url", L_VERBOSE );
                 $StreamStats->setStreaming($url);
