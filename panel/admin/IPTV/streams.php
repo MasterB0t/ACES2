@@ -11,7 +11,8 @@
     $r_server = $db->query("SELECT id,name FROM iptv_servers ");
     $r_bouquets = $db->query("SELECT id,name FROM iptv_bouquets ");
     $r_cats = $db->query("SELECT id,name FROM iptv_stream_categories ");
-    $r_stream_profiles = $db->query("SELECT id,name FROM iptv_stream_options WHERE only_chan_id = 0 ");
+    $r_stream_profiles = $db->query("SELECT id,name FROM iptv_stream_options 
+               WHERE only_chan_id = 0 ");
 
 ?><!DOCTYPE html>
 <html lang="en">
@@ -27,6 +28,8 @@
     <link rel="stylesheet" href="/plugins/fontawesome-free-6.2.1-web/css/all.min.css">
     <!-- Toastr -->
     <link rel="stylesheet" href="/plugins/toastr/toastr.min.css">
+    <!-- iCheck for checkboxes and radio inputs -->
+    <link rel="stylesheet" href="../../plugins/icheck-bootstrap/icheck-bootstrap.min.css">
     <!-- Select2 -->
     <link rel="stylesheet" href="/plugins/select2/css/select2.min.css">
     <link rel="stylesheet" href="/plugins/select2-bootstrap4-theme/select2-bootstrap4.min.css">
