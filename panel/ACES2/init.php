@@ -39,14 +39,14 @@ if(strpos($_SERVER['DOCUMENT_URI'], '/admin/') !== false  ||
         }
     }
 
-//    class LicException extends Exception {
-//        public function __construct(string $message = "", int $code = 0, ?Throwable $previous = null)
-//        {
-//            $this->line = $code;
-//            $this->file = "LicException.php";
-//            parent::__construct($message, $code, $previous);
-//        }
-//    }
+    class LicException extends Exception {
+        public function __construct(string $message = "", int $code = 0, ?Throwable $previous = null)
+        {
+            $this->line = $code;
+            $this->file = "LicException.php";
+            parent::__construct($message, $code, $previous);
+        }
+    }
 
     include_dir(DOC_ROOT . "/functions");
     include_dir(DOC_ROOT . "/class");
