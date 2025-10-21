@@ -223,7 +223,8 @@ else while($row=$r->fetch_assoc()) {
     $links .= "<a href='#!' title='Print account id or a message to all clients on this channel.' onClick=\"MODAL('modals/streams/mFingerPrint.php?channel_id={$row['id']}');\"> <i style='margin:5px;' class=' fa fa-barcode fa-lg'></i> </a>";
     $links .= "<a href='#!' title='Delete Stream and Sources' onClick=\"removeStream( {$row['id']} );\"> <i style='margin:5px;' class=' fa fa-remove fa-lg'></i> </a>";
 
-    $links .= "<a href='#!' title='Manage Load Balances' onClick=\"MODAL('modals/streams/mLoadBalance.php?channel_id={$row['id']}');\"> <i style='margin:5px;' class=' fa fa-server fa-lg'></i> </a>";
+    $links .= "<a href='#!' title='Manage Load Balances' onClick=\"MODAL('modals/mStreamLoadBalance.php?ids={$row['id']}');\"> <i style='margin:5px;' class=' fa fa-server fa-lg'></i> </a>";
+    //$links .= "<a href='#!' title='Manage Load Balances' onClick=\"MODAL('modals/streams/mLoadBalance.php?channel_id={$row['id']}');\"> <i style='margin:5px;' class=' fa fa-server fa-lg'></i> </a>";
     //$links .= "<a href='#!' title='Manage Load Balances' onClick=\"MODAL('modals/mChannelLoadBalance.php?channel_id={$row['id']}');\"> <i style='margin:5px;' class=' fa fa-server fa-lg'></i> </a>";
     $links .= "<a href='#!' title='Catchup/Recordings' onClick=\"MODAL('modals/streams/mCatchup.php?stream_id={$row['id']}');\"> <i style='margin:5px;' class=' fa fa-record-vinyl fa-lg'></i> </a>";
 
