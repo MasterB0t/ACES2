@@ -77,6 +77,40 @@ class LeagueTeams
                     'TITANS' => 'Tennessee Titans',
                 );
 
+            case 'NBA':
+                return array(
+                    'CELTICS'   => 'Boston Celtics',
+                    'NETS' => 'Brooklyn Nets',
+                    'KNICKS' => 'New York Knicks',
+                    '76ERS' => 'Philadelphia 76ers',
+                    'RAPTORS' => 'Toronto Raptors',
+                    'NUGGETS' => 'DENVER Nuggets',
+                    'TIMBERWOLVES' => 'Minnesota Timberwolves',
+                    'THUNDER' => 'Oklahoma City Thunder',
+                    'BLAZERS' => 'PORTLAND TRAIL BLAZERS',
+                    'JAZZ' => 'Utah Jazz',
+                    'BULLS' => 'Chicago Bulls',
+                    'CAVALIERS' => 'Cleveland Cavaliers',
+                    'PISTONS' => 'Detroit Pistons',
+                    'PACERS' => 'Indiana Pacers',
+                    'BUCKS' => 'Milwaukee Bucks',
+                    'WARRIORS' => 'Golden State Warriors',
+                    'CLIPPERS' => 'LA Clippers',
+                    'LAKERS' => 'Los Angeles Lakers',
+                    'SUNS' => 'Phoenix Suns',
+                    'KINGS' => 'Sacramento Kings',
+                    'HAWKS' => 'Atlanta Hawks',
+                    'HORNETS' => 'Charlotte Hornets',
+                    'HEAT' => 'Miami Heat',
+                    'MAGIC' => 'Orlando Magic',
+                    'WIZARDS' => 'Washington Wizards',
+                    'MAVERICKS' => 'Dallas Mavericks',
+                    'ROCKETS' => 'Houston Rockets',
+                    'GRIZZLIES' => 'Memphis Grizzlies',
+                    'PELICANS' => 'New Orleans Pelicans',
+                    'SPURS' => 'San Antonio Spurs'
+                );
+
             default:
                 throw new \Exeception("Unknown league '$league'");
         }
