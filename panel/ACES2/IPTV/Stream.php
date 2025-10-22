@@ -74,7 +74,7 @@ class Stream
         $this->ondemand = $row['ondemand'];
         $this->catchup_exp_days = $row['catchup_expire_days'];
         $this->source_type = $row['source_type'];
-        $this->no_clients_on_primary_server = (bool)$row['no_clients_on_primary_server'];
+        $this->no_clients_on_primary_server = (bool)$row['no_clients_on_primary_server'];https://urban.jusmytv.com:2053/
 
         $r=$db->query("SELECT source_server as source , destination_server as destination 
                             FROM iptv_channels_in_lb WHERE channel_id = $this->id ");
