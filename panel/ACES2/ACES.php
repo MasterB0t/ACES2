@@ -6,7 +6,7 @@ use Cache;
 
 class ACES {
 
-    const VERSION = '2.5.4';
+    const VERSION = '2.5.6';
     static function isNewVersion() {
 
         $Cache = new Cache('aces_version', 60 * 10 );
