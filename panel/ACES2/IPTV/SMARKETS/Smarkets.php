@@ -9,13 +9,15 @@ class Smarkets {
     private const EVENT_TYPES = array(
         'mlb' => 'baseball_match',
         'baseball' => 'baseball_match',
-        'nfl' => 'american_football_match'
+        'nfl' => 'american_football_match',
+        'nba' => 'basketball_match'
     );
 
     private const EVENT_FILTER = array( //SINCE I IS NOT POSSIBLE TO FILTER LEAGUE ON SMARKET WE WILL FIND THIS STRING ON FULL SLAG
         'mlb' => '/sport/baseball/mlb',
         'baseball' => '/sport/baseball',
-        'nfl' => '/sport/american-football/nfl/'
+        'nfl' => '/sport/american-football/nfl/',
+        'nba' => '/sport/basketball/nba/'
     );
 
     static public function getEvents(

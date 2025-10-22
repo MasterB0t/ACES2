@@ -130,7 +130,7 @@ class StreamEvent {
     }
 
     private function setEvents() {
-        $this->EVENTS = array('MLB', 'NFL');
+        $this->EVENTS = array('MLB', 'NFL', 'NBA');
     }
 
 }
