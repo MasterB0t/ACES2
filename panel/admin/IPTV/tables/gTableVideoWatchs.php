@@ -143,6 +143,7 @@ else while($row = $r->fetch_assoc()) {
         $watch,
         $is_enabled,
         $row['server_name'],
+        $row['interval_mins'],
         $last_run,
         $links
     );

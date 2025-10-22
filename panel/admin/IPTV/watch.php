@@ -25,6 +25,8 @@ $r_servers = $db->query("SELECT id,name FROM iptv_servers ");
           href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="/plugins/fontawesome-free-6.2.1-web/css/all.min.css">
+    <!-- iCheck -->
+    <link rel="stylesheet" href="/plugins/icheck-bootstrap/icheck-bootstrap.min.css">
     <!-- Toastr -->
     <link rel="stylesheet" href="/plugins/toastr/toastr.min.css">
     <!-- Select2 -->
@@ -142,6 +144,7 @@ $r_servers = $db->query("SELECT id,name FROM iptv_servers ");
                                         <th>Watch</th>
                                         <th>Status</th>
                                         <th>Server</th>
+                                        <th>Interval Mins</th>
                                         <th>Last Run</th>
                                         <th>Actions</th>
                                     </tr>
@@ -183,6 +186,7 @@ $r_servers = $db->query("SELECT id,name FROM iptv_servers ");
 <!-- Custom -->
 <script src="/dist/js/functions.js"></script>
 <script src="/dist/js/table.js"></script>
+<script src="/dist/js/Modal2.js"></script>
 <script src="/dist/js/admin.js"></script>
 <script>
     var table;
@@ -192,21 +196,20 @@ $r_servers = $db->query("SELECT id,name FROM iptv_servers ");
         TABLES.ajax.reload(null, false);
     }
 
+    function removeWatch(ids) {
 
-    function removeWatch(id) {
-
-        if(!confirm("Are you sure you want to remove this ?"))
+        if(!confirm("Are you sure you want to remove selected items?"))
             return false;
 
         $.ajax({
             url: 'ajax/pVideoWatch.php',
             type: 'post',
             dataType: 'json',
-            data: {action: 'remove_watch', id: id},
+            data: {action: 'remove_watch', ids: ids},
             success: function (resp) {
 
                 toastr.success("Removed");
-                TABLES.ajax.reload(null,false);
+                setTimeout(function() { TABLES.ajax.reload(null,false); }, 900 )
 
             }, error: function (xhr) {
 
@@ -284,6 +287,7 @@ $r_servers = $db->query("SELECT id,name FROM iptv_servers ");
             { className: 'select-checkbox'},
             {"targets": 1, "orderable": false },
             {"targets": 5, "orderable": false },
+            {"targets": 6, "orderable": false },
         ],
         order: [[0, 'asc']],
         select: {
@@ -314,7 +318,7 @@ $r_servers = $db->query("SELECT id,name FROM iptv_servers ");
                     } );
 
                     if(i>0)
-                        MODAL("modals/?ids="+post_id);
+                        Modal2.get({url : "modals/mWatchMassEdit.php?ids="+post_id } );
 
                 }
             },
@@ -331,7 +335,7 @@ $r_servers = $db->query("SELECT id,name FROM iptv_servers ");
                         i++;
                     } );
                     if(i > 0)
-                        MODAL("modals/?ids="+post_id);
+                        removeWatch(post_id.join(','))
                 }
             },
         ],

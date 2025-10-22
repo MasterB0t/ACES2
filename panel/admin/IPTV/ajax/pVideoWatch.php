@@ -112,12 +112,58 @@ try {
             $pid = (int)$_REQUEST['pid'];
             $db = new \ACES2\DB();
             $db->query("DELETE FROM iptv_proccess WHERE id = '$pid'");
+            setAjaxComplete();
+            break;
+
+        case 'mass_watch_edit' :
+
+            $db = new \ACES2\DB();
+
+            $update = [];
+            if($_REQUEST['enabled'] != '')
+                $update['enabled'] = $_REQUEST['enabled'] == 1 ? 1 : 0 ;
+
+            if($_REQUEST['set_interval'] != '')
+                $update['interval_mins'] = (int)$_REQUEST['interval_mins'];
+
+            //VALIDATE BOUQUETS
+            $bouquets =[];
+            if($_REQUEST['set_bouquets'])
+                foreach($_REQUEST['bouquets'] as $b) {
+                    if((int) $b)
+                        $bouquets[] = $b;
+                }
+
+            $sql = \ACES2\DB::arrayToSql($update);
+
+            foreach( explode(",",$_REQUEST['ids']) as  $id ) {
+                $id = (int)$id;
+                if($sql)
+                    $db->query("UPDATE iptv_folder_watch SET $sql WHERE id = '$id'");
+
+                if($_REQUEST['set_bouquets']) {
+                    $r = $db->query("SELECT params FROM iptv_folder_watch WHERE id = '$id'");
+                    if($row=$r->fetch_assoc()) {
+                        $params = json_decode($row['params'],1);
+                        $params['bouquets'] = $bouquets;
+                        $db->query("UPDATE iptv_folder_watch SET params = '".json_encode($params)."' WHERE id = '$id'");
+                    }
+
+                }
+
+            }
+
+
             break;
 
         case 'remove_watch':
-            $WatchID = (int)$_REQUEST['id'];
-            $db = new \ACES2\DB();
-            $db->query("DELETE FROM iptv_folder_watch WHERE id = '$WatchID'");
+            $ids = explode(',',$_REQUEST['ids']);
+            foreach($ids as $id) {
+                $WatchID = (int)$id;
+                $db = new \ACES2\DB();
+                $db->query("DELETE FROM iptv_folder_watch WHERE id = '$WatchID'");
+            }
+
             break;
 
         default:
