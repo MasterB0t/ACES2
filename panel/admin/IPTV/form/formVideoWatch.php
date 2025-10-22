@@ -22,6 +22,7 @@ $import_from_xc_cat = 0;
 $xc_import_movies = false;
 $xc_import_series = false;
 $watch_type = 'movie';
+$categories = [];
 
 
 $get_info_from = "tmdb";
@@ -36,6 +37,7 @@ if($EditID = @(int)$_GET['id']) {
     $Edit = $r->fetch_assoc();
     $interval = $Edit['interval_mins'];
     $params = json_decode($Edit['params'], true)?: unserialize($Edit['params']);
+    $categories = $params['categories'];
     $do_not_download_images = (bool)$params['do_not_download_images'];
     $enabled = (bool)$Edit['enabled'];
     $server_id = $Edit['server_id'];
@@ -96,6 +98,8 @@ include DOC_ROOT . "/includes/languages.php";
           href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="/plugins/fontawesome-free-6.2.1-web/css/all.min.css">
+    <!-- iCheck -->
+    <link rel="stylesheet" href="/plugins/icheck-bootstrap/icheck-bootstrap.min.css">
     <!-- Toastr -->
     <link rel="stylesheet" href="/plugins/toastr/toastr.min.css">
     <!-- Select2 -->
@@ -131,6 +135,12 @@ include DOC_ROOT . "/includes/languages.php";
                         </ol>
                     </div>
                     <div class="col-sm-6">
+                        <button form="formFolderWatch" type="submit" class="btn btn-primary btn-sm float-right">
+                            <?=$EditID ? 'Save' : 'Add';?>
+                        </button>
+
+                        <a href="../watch.php"
+                           type="button" class="btn btn-default btn-sm float-right mr-3">Go Back</a>
                     </div>
                 </div>
             </div><!-- /.container-fluid -->
@@ -159,7 +169,6 @@ include DOC_ROOT . "/includes/languages.php";
                                 </div>
 
                                 <?php if($xc_account) { ?>
-
 
 
                                     <div class="form-group" >
@@ -231,35 +240,14 @@ include DOC_ROOT . "/includes/languages.php";
 
                                 <div class="form-group">
                                     <label> Select Categories to be added to those movies/series </label>
-                                    <select onchange="addCategory()" name="sub_category" class="form-control select2">
+                                    <select multiple name="categories[]" class="form-control select2">
                                         <option value="">Categories</option>
                                         <option value="-1"><?=$xc_account ? "Add XC Category" : "Add TMDB Categories" ?></option>
                                         <?php while($c = $r_category->fetch_assoc()) {
-                                            echo "<option value=\"{$c['id']}\">{$c['name']}</option>";
+                                            $s = in_array($c['id'], $categories) ? ' selected ' : '';
+                                            echo "<option $s value=\"{$c['id']}\">{$c['name']}</option>";
                                         } ?>
                                     </select>
-                                    <div class="list-categories">
-                                        <?php if($EditID) {
-                                            foreach($params['categories'] as $c) {
-                                                if($c ==  -1 )
-                                                    $c_name = $xc_account ? "Add XC Category" : "Add TMDB Categories";
-                                                else {
-                                                    try {
-                                                        $cat = new \ACES2\IPTV\Category($c);
-                                                        $c_name = $cat->name;
-
-                                                        ?>
-                                                            <span class='badge badge-success'>
-                                                            <input type='hidden' class='otherCats' name='categories[]' value='<?=$c?>' />
-                                                            <?=$c_name;?><a href='#!' onclick='removeCat(this)'>X</a></span>
-                                                        <?php
-
-                                                    } catch(\Exception $e) { $ignore = 1;}
-                                                }
-
-                                            }
-                                        } ?>
-                                    </div>
                                 </div>
 
                                 <div class="form-group "  >
@@ -293,21 +281,19 @@ include DOC_ROOT . "/includes/languages.php";
                                 </div>
 
                                 <div class="form-group-bs pb-3">
-                                    <label> Enabled</label>
-                                    <input type="checkbox" class="bootstrap-switch"  name="enabled" />
+                                    <label for="chkEnabled"> Enabled</label>
+                                    <input type="checkbox"
+                                           id="chkEnabled"
+                                           class="bootstrap-switch"  name="enabled" />
                                 </div>
 
                                 <div class="form-group-bs">
-                                    <label>Do not download images.</label>
-                                    <input type="checkbox" class="bootstrap-switch"  name="do_not_download_images"/>
+                                    <label for="chkNoDownloadLogos">Do not download images.</label>
+                                    <input type="checkbox"
+                                           id="chkNoDownloadLogos"
+                                           class="bootstrap-switch" name="do_not_download_images"/>
                                 </div>
 
-                            </div>
-
-                            <div class="card-footer">
-                                    <button type="submit" class="btn btn-primary btn-sm float-right">
-                                        <?=$EditID ? 'Save' : 'Add';?>
-                                    </button>
                             </div>
 
                         </div>
@@ -319,20 +305,24 @@ include DOC_ROOT . "/includes/languages.php";
                                 <h4 class="card-title">Bouquets</h4>
                             </div>
                             <div class="card-body">
-                                <h4 style="font-weight:bold;"><span style='font-size:16px'>
-                                        <a href="#!" onclick='toggleAllBouquets(true);'>Check</a>/<a href="#!" onclick='toggleAllBouquets(false);'>Un Check All.</a></span></h4>
+
+                                <h5 style="font-weight:bold;">
+                                    <span style='font-size:16px'>
+                                        <a href="#!" onclick='toggleAllBouquets(true);'>Check</a>/<a href="#!"
+                                             onclick='toggleAllBouquets(false);'>Un Check All.</a>
+                                    </span>
+                                </h5>
 
                                 <input  name="bouquets[]" value="" type="hidden">
 
                                 <?php
-
                                 while ($row = $r_bouquets->fetch_assoc()) { ?>
 
-                                    <label style='margin-left:10px; margin-bottom:10px'>
-                                        <input name="bouquets[]"
-                                               value="<?php echo $row['id'];?>"
-                                               type="checkbox"> <?php echo $row['name']; ?>
-                                    </label>
+                                    <div  class="icheck-primary d-inline ml-2">
+                                        <input type="checkbox" value="<?=$row['id']?>"
+                                               name="bouquets[]" id="chkBouquet<?=$row['id']?>">
+                                        <label for="chkBouquet<?=$row['id']?>"><?=$row['name']?></label>
+                                    </div>
 
                                 <?php } ?>
 
@@ -342,6 +332,18 @@ include DOC_ROOT . "/includes/languages.php";
 
                     </div>
                 </div>
+
+                <div class="row pb-3 pr-2">
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary btn-sm float-right">
+                            <?=$EditID ? 'Save' : 'Add';?>
+                        </button>
+
+                        <a href="../watch.php"
+                           type="button" class="btn btn-default btn-sm float-right mr-3">Go Back</a>
+                    </div>
+                </div>
+
             </form>
         </section>
         <!-- /.content -->
@@ -373,6 +375,8 @@ include DOC_ROOT . "/includes/languages.php";
 <script src="/dist/js/admin.js"></script>
 <script>
 
+
+
     function importFromCat() {
 
         name = $( "select[name='import_from_category'] option:selected").text();
@@ -402,23 +406,6 @@ include DOC_ROOT . "/includes/languages.php";
                 $(obj).select2();
             }
         });
-    }
-
-    function addCategory() {
-
-        txt = $("select[name='sub_category']>option:selected").text();
-        val = $("select[name='sub_category']>option:selected").val();
-
-
-        if( $("input[value='"+val+"'].otherCats").length == 0 )
-            $(".list-categories").append("<span class='badge badge-success'>" +
-                "<input type='hidden' class='otherCats' name='categories[]' value='"+val+"'/>"
-                +txt+"<a href='#!' onclick='removeCat(this)'>X</a></span>");
-
-        $("select[name='sub_category']").val(0);
-        $("select[name='sub_category']").select2();
-
-
     }
 
     function removeCat(obj) {
