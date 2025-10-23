@@ -213,14 +213,17 @@ try {
             $remove_vod = (bool)$_REQUEST['remove_vod'];
             $db = new \ACES2\DB;
 
-
             if(count(\ACES2\Process::getProcessByType('iptv.remove_video_reports')) > 0 )
                 throw new \Exception("Another process is still running.");
-
 
             $Process = \ACES2\Process::add('iptv.remove_video_reports', 1,  0,
                 'Removing video reports.');
             setAjaxComplete('',false);
+
+            register_shutdown_function(function() {
+                global $Process;
+                $Process->remove();
+            });
 
             if($_REQUEST['ids'] == 'all' ) {
                 //MAKE SURE WHE DONT GET REPORTS WHERE VIDEO FILE DO NOT EXIST
