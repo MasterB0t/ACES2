@@ -197,7 +197,7 @@ $d = 1;
         sourceTxt = $('#selectSource').find(":selected").text()
         destinationTxt = $('#selectDestination').find(":selected").text()
 
-        if($("select[name='main_server']").val() === '' ) {
+        if($("select[name='primary_server']").val() === '' ) {
             toastr.error("Select main server.")
             return
         }
@@ -274,7 +274,7 @@ $d = 1;
         $(".bs-switch").bootstrapSwitch();
         resetLbs();
 
-        $("select[name='main_server']").change(function(){
+        $("select[name='primary_server']").change(function(){
 
             resetLbs();
             $('.divLbs').html('');
