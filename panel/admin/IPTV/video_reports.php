@@ -82,8 +82,7 @@ $r_server = $db->query("SELECT id,name FROM iptv_servers ");
         <section class="content">
             <div class="container-fluid">
 
-                <div class="row row-progress pr-2 pl-2">
-                </div>
+                <div class="row row-progress pr-2 pl-2"></div>
 
 <!--                <div  id="m3u_importer" class="col-12 col-md-6">-->
 <!--                    <div class="card collapsed-card">-->
@@ -248,7 +247,7 @@ $r_server = $db->query("SELECT id,name FROM iptv_servers ");
 
     $(document).ready(function() {
 
-        PROCESS.get({   processToGet : ['iptv.remove_video_reports','iptv.check_videos'] });
+        PROCESS.get({ processToGet : ['iptv.remove_video_reports','iptv.check_videos'], 'appendTo' : '.row-progress' });
 
     })
 

@@ -266,7 +266,7 @@ try {
             } else {
 
                 $ids = explode(',', $_REQUEST['ids']);
-
+                $progress = 0;
                 foreach($ids as $id ) {
 
                     $db->query("DELETE FROM iptv_video_reports WHERE file_id = '$id' ");
@@ -289,6 +289,9 @@ try {
                         }
 
                     }
+                    $progress++;
+                    $Process->calculateProgress( $progress,count($ids));
+
                 }
 
             }
