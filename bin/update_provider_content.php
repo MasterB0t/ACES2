@@ -1,6 +1,5 @@
 <?php
 
-
 //if(defined('DEBUG'))
 //    error_reporting(E_ALL);
 //else
@@ -15,6 +14,15 @@ $last_series_import = 0;
 
 if(!$AccountID = (int)$argv[1])
     exit;
+
+$LogFile = "/home/aces/logs/update_provider_content_{$AccountID}.log";
+$f = @fopen($LogFile, "r+");
+if ($f !== false) {
+    ftruncate($f, 0);
+    fclose($f);
+}
+
+ini_set("error_log", $LogFile);
 
 #include_once '/home/aces/panel/ACES2/init.php';
 require_once '/home/aces/stream/config.php';
@@ -81,10 +89,11 @@ try {
             $stream_name = $DB->escString($XCStream->name);
             $stream_epg = $DB->escString($XCStream->epg_channel_id);
             $stream_cat_name = $streams_cats[$XCStream->category_id];
+            $stream_icon = $DB->escString($XCStream->stream_icon);
 
             $DB->query("INSERT INTO iptv_provider_content_streams 
                 (num, name, stream_type, stream_id, stream_icon, category_id, category_name, epg_channel_id, custom_sid, provider_id) 
-            VALUES('$XCStream->num', '$stream_name', '$XCStream->stream_type', '$XCStream->stream_id', '$XCStream->stream_icon', '$XCStream->category_id', 
+            VALUES('$XCStream->num', '$stream_name', '$XCStream->stream_type', '$XCStream->stream_id', '$stream_icon', '$XCStream->category_id', 
                    '$stream_cat_name', '$stream_epg', '$XCStream->custom_sid', '$AccountID')
             ");
         }
