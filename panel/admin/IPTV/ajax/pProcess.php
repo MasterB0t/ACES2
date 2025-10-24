@@ -32,10 +32,11 @@ switch(strtoupper($_REQUEST['action'])){
 
             }
 
+            $r=$db->query("SELECT * FROM process WHERE type = '$process' ");
+            $data[$process] = $r->fetch_all(MYSQLI_ASSOC);
+
         }
 
-        $r=$db->query("SELECT * FROM process WHERE type = '$process' ");
-        $data[$process] = $r->fetch_all(MYSQLI_ASSOC);
         break;
 
     case 'KILL_PROCESS':
