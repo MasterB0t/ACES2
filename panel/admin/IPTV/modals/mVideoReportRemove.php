@@ -51,8 +51,8 @@ if (!$Admin->hasPermission(\ACES2\IPTV\AdminPermissions::IPTV_VOD_FULL)) {
             data: $(this).serialize(),
             success: function (resp) {
                 toastr.success("Success");
-                setTimeout(reloadTable, 800);
                 $(".cmodal").modal('hide');
+                setTimeout(function() { TABLES.ajax.reload() }, 800);
             }, error: function (xhr) {
                 $("#formModal button[type='submit']").prop("disabled", false);
                 switch (xhr.status) {
