@@ -19,6 +19,7 @@ define('DB_PASS', $DBPASS );
 define('DB_HOST', $DBHOST );
 
 $RELOAD_SETTINGS=1;
+$DB=null;
 
 $SCRIPT = is_file("/home/aces/old_stream") ? 'aces_stream.php' : "iptv_stream.php" ;
 
@@ -41,28 +42,29 @@ if(is_file($PID_FILE)) {
 if( getmypid() != $PID )
     if(! (file_put_contents($PID_FILE,getmypid()) ) ) { error_log("COULD NOT WRITE PID TO FILE"); DIE; }
 
-while(true) {
-    $DB = new mysqli($DBHOST,$DBUSER,$DBPASS,$DATABASE);
-    if($DB->connect_errno > 0)  {
-        error_log('Could not connect to mysql trying again in five seconds.');
-        sleep(5);
-    }  else break;
+function ConnectToDB() {
+    global $DB,$DBHOST,$DBUSER,$DBPASS,$DATABASE;
+    while(true) {
+        try  {
+            error_log("CONNECTING TO DB...");
+            $DB = new mysqli($DBHOST,$DBUSER,$DBPASS,$DATABASE);
+            if($DB->connect_errno > 0)  {
+                error_log('Could not connect to mysql trying again in five seconds.');
+                sleep(5);
+            }  else return;
+        } catch (\mysqli_sql_exception $exp) {
+            error_log('Could not connect to mysql trying again in five seconds.');
+            $ignore = 1;
+            sleep(5);
+
+        }
+    }
 
 }
 
+ConnectToDB();
+
 error_log("\n\n\nService Start.");
-
-
-//$ch = curl_init();
-//curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-//curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-//curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 2);
-//curl_setopt($ch, CURLOPT_URL, "https://acescript.ddns.net/c.php");
-//$return=json_decode(curl_exec($ch),1);
-//curl_exec($ch);
-//if(curl_errno($ch)) { error_log("UNABLE TO START SERVICE."); unlink($PID_FILE); die; }
-
-
 
 
 function get_disk_info() {
@@ -114,10 +116,6 @@ function get_disk_info() {
 }
 
 
-
-//EXIT IF NEVER CONNECT WITH MYSQL.
-//if($DB->connect_errno > 0) die;
-
 //LOADING FIREWALL RULES.
 if ($IS_PANEL) {
     if (!is_file('/home/aces/NO_FIREWALL') && !is_file('/home/aces/no_firewall')) {
@@ -165,7 +163,6 @@ function StartStreams()  {
     #exec("kill -9 $(ps -eAf  | grep /stream_tmp/ | grep ffmpeg | grep -v 'ps -eAf'  | awk '{print $2 }') ");
     exec("kill -9  $(ps aux | grep '$SCRIPT' | awk '{print $2}') 2>/dev/null ");
 
-
     //STOPING RECORDINGS.
     exec("pgrep -f 'catchup.php'",$pids);
     foreach($pids as $pid) exec("kill -9 $pid "); exec("kill -9 $pid ");
@@ -180,8 +177,11 @@ function StartStreams()  {
 
     exec(" rm -rf /home/aces/stream_tmp/*");
 
-    $r=$DB->query("SELECT * FROM settings WHERE name = 'iptv.streamsstartup' AND value = '1' ");
-    if($r->fetch_assoc()) {
+
+    try {
+
+        $r=$DB->query("SELECT * FROM settings WHERE name = 'iptv.streamsstartup' AND value = '1' ");
+        if($r->fetch_assoc()) {
             //LET START STREAMS
 
             //$res=$DB->query("SELECT id,load_balances,stream_server,catchup,ondemand,type FROM iptv_channels WHERE stream = 1 AND enable = 1  ");
@@ -198,22 +198,22 @@ function StartStreams()  {
                 ");
             while($stream=$res->fetch_assoc()) {
 
-                    $stream_id = $stream['id'];
+                $stream_id = $stream['id'];
 
-                    //ONLY IF IT HAVE SOURCES.
-                    //$r=$DB->query("SELECT id FROM iptv_channels_sources WHERE chan_id = '$stream_id' AND enable = 1  ");
-                    //if($r->fetch_assoc() || $stream['type'] == 1) {
-                    //if($r->fetch_assoc() || $stream['type'] == 1) {
+                //ONLY IF IT HAVE SOURCES.
+                //$r=$DB->query("SELECT id FROM iptv_channels_sources WHERE chan_id = '$stream_id' AND enable = 1  ");
+                //if($r->fetch_assoc() || $stream['type'] == 1) {
+                //if($r->fetch_assoc() || $stream['type'] == 1) {
 
-                        //INSERTING STREAMING ROW.
-                        if($stream['ondemand'])
-                            $DB->query("INSERT INTO iptv_streaming (chan_id,action,status,server_id,last_access,start_time) VALUES ('$stream_id',0,2,'{$stream['stream_server']}',NOW(),NOW()) ");
-                        else {
-                            $DB->query("INSERT INTO iptv_streaming (chan_id,action,server_id,last_access,start_time) VALUES ('$stream_id',1,'{$stream['stream_server']}',NOW(),NOW()) ");
-                            if($IS_PANEL && $stream['catchup'] == 1) exec("su aces -c 'nohup php /home/aces/bin/catchup.php -{$stream['id']}- > /dev/null &' " );
-                        }
+                //INSERTING STREAMING ROW.
+                if($stream['ondemand'])
+                    $DB->query("INSERT INTO iptv_streaming (chan_id,action,status,server_id,last_access,start_time) VALUES ('$stream_id',0,2,'{$stream['stream_server']}',NOW(),NOW()) ");
+                else {
+                    $DB->query("INSERT INTO iptv_streaming (chan_id,action,server_id,last_access,start_time) VALUES ('$stream_id',1,'{$stream['stream_server']}',NOW(),NOW()) ");
+                    if($IS_PANEL && $stream['catchup'] == 1) exec("su aces -c 'nohup php /home/aces/bin/catchup.php -{$stream['id']}- > /dev/null &' " );
+                }
 
-                    //}
+                //}
 
             }
 
@@ -231,15 +231,27 @@ function StartStreams()  {
 
             $DB->query("UPDATE iptv_servers SET streams = '$c' WHERE id = '$SERVER_ID' ");
 
+        }
+
+        //RESTARTING RECORDINGS.
+        $r_recordings=$DB->query("SELECT id FROM iptv_recording WHERE status in (1,2) AND server_id = '$SERVER_ID' ");
+        while($row_recording=mysqli_fetch_array($r_recordings)) {
+            @exec("su aces -c 'nohup php /home/aces/bin/record.php {$row_recording['id']}- > /dev/null &' " );
+        }
+
+
+    } catch(\mysqli_sql_exception $exp ) {
+        sleep(5);
+        //RETRY.
+        ConnectToDB();
     }
 
-    //RESTARTING RECORDINGS.
-    $r_recordings=$DB->query("SELECT id FROM iptv_recording WHERE status in (1,2) AND server_id = '$SERVER_ID' ");
-    while($row_recording=mysqli_fetch_array($r_recordings)) {
-       @exec("su aces -c 'nohup php /home/aces/bin/record.php {$row_recording['id']}- > /dev/null &' " );
-    }
+
+    return;
 
 }
+
+
 StartStreams();
 
 
@@ -265,267 +277,240 @@ $output = array();
 exec("df -h | awk '{print $6 }' ", $output);
 foreach($output as $i => $v ) {
 
-  if( $v == '/' || $v == '/home' || $v == '/home/aces' || $v == '/home/aces/vods' || $v == '/home/aces/stream_tmp' ) $mount_points[] = $v;
+    if( $v == '/' || $v == '/home' || $v == '/home/aces' || $v == '/home/aces/vods' || $v == '/home/aces/stream_tmp' ) $mount_points[] = $v;
 
 }
 
-
-
 while(true) {
 
-    clearstatcache();
+    try {
 
-    $c_lost_msg = null;
-    while (!$DB->ping()) {
-        if (!$c_lost_msg) {
-            error_log("Connecting lost to database.");
-            $c_lost_msg = 1;
-        }
-        unset($DB);
-        $DB = new mysqli($DBHOST, $DBUSER, $DBPASS, $DATABASE);
-        if ($DB->connect_errno > 0) {
-            sleep(3);
-        } else {
 
-            //RESTART STREAMS...
-            if ($IS_PANEL) {
-                $DB->query("DELETE FROM iptv_streaming ");
-                StartStreams();
-            }
+        clearstatcache();
 
-            break;
-        }
-    }
-
-    if ($RELOAD_SETTINGS && !$IS_PANEL) {
-
-        if (!is_file('/home/aces/NO_FIREWALL')) {
-
-//            exec("iptables -F ");
-//            if ($r_fw = $DB->query("SELECT * FROM firewall WHERE type = 0  ")) {
-//                while ($row = mysqli_fetch_array($r_fw)) {
-//
-//                    $opt = '';
-//                    if (!empty($row['protocol']))
-//                        $opt .= " -p {$row['protocol']} ";
-//                    if (!empty($row['port']))
-//                        $opt .= " --dport {$row['port']}";
-//
-//                    if (!empty($row['options'])) {
-//                        $opt .= " {$row['options']} ";
-//                    }
-//
-//                    $A = ' -A INPUT ';
-//                    if ($row['rule'] == 0)
-//                        $opt .= " -j DROP ";
-//                    if ($row['rule'] == 1) {
-//                        $A = ' -I INPUT 1 ';
-//                        $opt .= " -j ACCEPT ";
-//                    }
-//
-//
-//                    exec("sudo /sbin/iptables $A -s {$row['value']} $opt ");
-//                }
-//                $r_fw->free();
-//                unset($row);
+//        $c_lost_msg = null;
+//        while (!$DB->ping()) {
+//            if (!$c_lost_msg) {
+//                error_log("Connecting lost to database.");
+//                $c_lost_msg = 1;
 //            }
+//            unset($DB);
+//            $DB = new mysqli($DBHOST, $DBUSER, $DBPASS, $DATABASE);
+//            if ($DB->connect_errno > 0) {
+//                sleep(3);
+//            } else {
 //
-//            #exec("sudo /sbin/iptables -A INPUT -p tcp --dport 1935 -j DROP ");
+//                //RESTART STREAMS...
+//                if ($IS_PANEL) {
+//                    $DB->query("DELETE FROM iptv_streaming ");
+//                    StartStreams();
+//                }
+//
+//                break;
+//            }
+//        }
+
+        if ($RELOAD_SETTINGS && !$IS_PANEL) {
+
+
+            $RELOAD_SETTINGS = 0;
+            $DB->query("UPDATE iptv_servers SET reload_settings = 0 WHERE id = $SERVER_ID ");
+
         }
 
-        $RELOAD_SETTINGS = 0;
-        $DB->query("UPDATE iptv_servers SET reload_settings = 0 WHERE id = $SERVER_ID ");
 
-    }
+        $time = time();
 
+        if (!$last_check_streams || ($last_check_streams + 1) < time()) {
 
-    $time = time();
+            if ($r_streams = $DB->query("SELECT s.id,s.chan_id,s.action,c.catchup FROM iptv_streaming s 
+                INNER JOIN iptv_channels c ON c.id = s.chan_id WHERE s.server_id = '$SERVER_ID' AND s.action != 0 ")) {
+                while ($row_streams = mysqli_fetch_array($r_streams)) {
 
-    if (!$last_check_streams || ($last_check_streams + 1) < time()) {
+                    //REMOVING TMPS FILES
+                    exec(" rm -rf /home/aces/stream_tmp/{$row_streams['chan_id']}-*");
+                    exec(" rm -rf /home/aces/stream_tmp/{$row_streams['chan_id']}_*");
 
-        if ($r_streams = $DB->query("SELECT s.id,s.chan_id,s.action,c.catchup FROM iptv_streaming s INNER JOIN iptv_channels c ON c.id = s.chan_id WHERE s.server_id = '$SERVER_ID' AND s.action != 0 ")) {
-            while ($row_streams = mysqli_fetch_array($r_streams)) {
-
-                //REMOVING TMPS FILES
-                exec(" rm -rf /home/aces/stream_tmp/{$row_streams['chan_id']}-*");
-                exec(" rm -rf /home/aces/stream_tmp/{$row_streams['chan_id']}_*");
-
-                //KILL CATCHUP IF EXIST.
-                //exec("kill -9  $(ps -eAf  | grep /home/aces/bin/catchup.php | grep '\-{$row_streams['chan_id']}\-'  | grep -v 'ps -eAf'  | awk '{print $2 }' )");
-
-                if (is_file("/home/aces/run/aces_stream-{$row_streams['chan_id']}.pid")) {
-                    if ($stream_pid = file_get_contents("/home/aces/run/aces_stream-{$row_streams['chan_id']}.pid")) {
-                        if (posix_getpgid($stream_pid)) exec("kill -9 $stream_pid");
-                        exec("kill -9  $(ps -eAf  | grep /{$row_streams['chan_id']}-.m3u8 | grep ffmpeg | grep -v 'ps -eAf'  | awk '{print $2 }' )");
-                        unlink("/home/aces/run/aces_stream-{$row_streams['chan_id']}.pid");
-                    }
-
-                }
-
-                //STOPPING BUILDING
-                if (is_file("/home/aces/run/aces_build_channel-{$row_streams['chan_id']}.pid")) {
-                    if ($stream_pid = file_get_contents("/home/aces/run/aces_build_channel-{$row_streams['chan_id']}.pid")) {
-                        if (posix_getpgid($stream_pid)) exec("kill -9 $stream_pid");
-                        unlink("/home/aces/run/aces_build_channel-{$row_streams['chan_id']}.pid");
-                    }
-
-                }
-
-                $DB->query("DELETE FROM iptv_access WHERE chan_id = '{$row_streams['chan_id']}' AND device_id != 0 ");
-
-                //START STREAM
-                if ($row_streams['action'] == 1) {
-
-                    $run = "php /home/aces/bin/$SCRIPT {$row_streams['chan_id']}- ";
-                    @exec("su aces -c 'nohup $run > /dev/null &' ");
-                    //if($IS_PANEL && $row_streams['catchup'] == 1) exec("su aces -c 'nohup php /home/aces/bin/catchup.php -{$row_streams['chan_id']}- > /dev/null &' " );
-
-                    $DB->query("UPDATE iptv_streaming set action = 0 WHERE id = '{$row_streams['id']}' ");
-
-                } else if ($row_streams['action'] == 2) {
-
-                    $DB->query("DELETE FROM iptv_streaming WHERE id = '{$row_streams['id']}' ");
-                    //STOPING CATCHUP IF EXIST
+                    //KILL CATCHUP IF EXIST.
                     //exec("kill -9  $(ps -eAf  | grep /home/aces/bin/catchup.php | grep '\-{$row_streams['chan_id']}\-'  | grep -v 'ps -eAf'  | awk '{print $2 }' )");
 
+                    if (is_file("/home/aces/run/aces_stream-{$row_streams['chan_id']}.pid")) {
+                        if ($stream_pid = file_get_contents("/home/aces/run/aces_stream-{$row_streams['chan_id']}.pid")) {
+                            if (posix_getpgid($stream_pid)) exec("kill -9 $stream_pid");
+                            exec("kill -9  $(ps -eAf  | grep /{$row_streams['chan_id']}-.m3u8 | grep ffmpeg | grep -v 'ps -eAf'  | awk '{print $2 }' )");
+                            unlink("/home/aces/run/aces_stream-{$row_streams['chan_id']}.pid");
+                        }
+
+                    }
+
+                    //STOPPING BUILDING
+                    if (is_file("/home/aces/run/aces_build_channel-{$row_streams['chan_id']}.pid")) {
+                        if ($stream_pid = file_get_contents("/home/aces/run/aces_build_channel-{$row_streams['chan_id']}.pid")) {
+                            if (posix_getpgid($stream_pid)) exec("kill -9 $stream_pid");
+                            unlink("/home/aces/run/aces_build_channel-{$row_streams['chan_id']}.pid");
+                        }
+
+                    }
+
+                    $DB->query("DELETE FROM iptv_access WHERE chan_id = '{$row_streams['chan_id']}' AND device_id != 0 ");
+
+                    //START STREAM
+                    if ($row_streams['action'] == 1) {
+
+                        $run = "php /home/aces/bin/$SCRIPT {$row_streams['chan_id']}- ";
+                        @exec("su aces -c 'nohup $run > /dev/null &' ");
+                        //if($IS_PANEL && $row_streams['catchup'] == 1) exec("su aces -c 'nohup php /home/aces/bin/catchup.php -{$row_streams['chan_id']}- > /dev/null &' " );
+
+                        $DB->query("UPDATE iptv_streaming set action = 0 WHERE id = '{$row_streams['id']}' ");
+
+                    } else if ($row_streams['action'] == 2) {
+
+                        $DB->query("DELETE FROM iptv_streaming WHERE id = '{$row_streams['id']}' ");
+                        //STOPING CATCHUP IF EXIST
+                        //exec("kill -9  $(ps -eAf  | grep /home/aces/bin/catchup.php | grep '\-{$row_streams['chan_id']}\-'  | grep -v 'ps -eAf'  | awk '{print $2 }' )");
+
+                    }
+
                 }
 
+                $r_streams->free();
+
+                $last_check_streams = time();
             }
 
-            $r_streams->free();
-
-            $last_check_streams = time();
         }
 
-    }
 
+        //STARTING RECORINGS.
+        if (!$last_time_record || ($last_time_record + 10) < time()) {
+            if ($r_recordings = $DB->query("SELECT id FROM iptv_recording WHERE status = 0 AND server_id = '$SERVER_ID' ")) {
+                while ($row_recordings = mysqli_fetch_array($r_recordings)) {
 
-    //STARTING RECORINGS.
-    if (!$last_time_record || ($last_time_record + 10) < time()) {
-        if ($r_recordings = $DB->query("SELECT id FROM iptv_recording WHERE status = 0 AND server_id = '$SERVER_ID' ")) {
-            while ($row_recordings = mysqli_fetch_array($r_recordings)) {
+                    //exec("kill -9  $(ps -eAf  | grep 'record.php {$row_recordings['id']}-' | grep -v 'ps -eAf' | awk '{print $2 }' )");
 
-                //exec("kill -9  $(ps -eAf  | grep 'record.php {$row_recordings['id']}-' | grep -v 'ps -eAf' | awk '{print $2 }' )");
+                    if (is_file("/home/aces/run/record-{$row_recordings['id']}.pid")) {
 
-                if (is_file("/home/aces/run/record-{$row_recordings['id']}.pid")) {
+                        if ($pid = file_get_contents("/home/aces/run/record-{$row_recordings['id']}.pid")) exec("kill -9 $pid ");
+                        unlink("/home/aces/run/recording-{$row_recordings['id']}.pid");
 
-                    if ($pid = file_get_contents("/home/aces/run/record-{$row_recordings['id']}.pid")) exec("kill -9 $pid ");
-                    unlink("/home/aces/run/recording-{$row_recordings['id']}.pid");
-
+                    }
+                    @exec("su aces -c 'nohup php /home/aces/bin/record.php {$row_recordings['id']}- > /dev/null &' ");
                 }
-                @exec("su aces -c 'nohup php /home/aces/bin/record.php {$row_recordings['id']}- > /dev/null &' ");
+                $r_recordings->free();
             }
-            $r_recordings->free();
-        }
-        $last_time_record = time();
-    }
-
-    //DELETE OLD RECORDS
-    if (!$last_time_del_record || ($last_time_del_record + (30)) < time()) {
-
-        if ($r_delrecord = $DB->query("SELECT id FROM iptv_recording WHERE status = 4 AND server_id = '$SERVER_ID' OR expire_date IS NOT NULL AND server_id = '$SERVER_ID' AND expire_date < NOW()  ")) {
-
-            while ($row_del_record = mysqli_fetch_array($r_delrecord)) {
-
-                exec("kill -9 $(pgrep -f 'php /home/aces/bin/record.php {$row_del_record['id']}\-') ");
-                exec("kill -9 $(ps -eAf  | grep /home/aces/recordings/ | grep ffmpeg | grep 'p{$row_del_record['id']}\-'  |  grep -v 'ps -eAf'  | awk '{print $2 }') ");
-
-                exec("rm -f /home/aces/recordings/r{$row_del_record['id']}.ts");
-                exec("rm -f /home/aces/recordings/p{$row_del_record['id']}-*.ts");
-                exec("rm -f /home/aces/recordings/r{$row_del_record['id']}.mkv");
-                exec("rm -f /home/aces/recordings/r{$row_del_record['id']}.mp4");
-
-                $DB->query("DELETE FROM iptv_recording WHERE id = '{$row_del_record['id']}' ");
-            }
-
-            $r_delrecord->free();
+            $last_time_record = time();
         }
 
-        $last_time_del_record = time();
+        //DELETE OLD RECORDS
+        if (!$last_time_del_record || ($last_time_del_record + (30)) < time()) {
 
-    }
+            if ($r_delrecord = $DB->query("SELECT id FROM iptv_recording WHERE status = 4 AND server_id = '$SERVER_ID' OR expire_date IS NOT NULL AND server_id = '$SERVER_ID' AND expire_date < NOW()  ")) {
 
+                while ($row_del_record = mysqli_fetch_array($r_delrecord)) {
 
-    //GET DISK SPACE EVERY 10 MINUTES
-    if (!$last_time_disk_space || ($last_time_disk_space + (60 * 10)) < time()) {
+                    exec("kill -9 $(pgrep -f 'php /home/aces/bin/record.php {$row_del_record['id']}\-') ");
+                    exec("kill -9 $(ps -eAf  | grep /home/aces/recordings/ | grep ffmpeg | grep 'p{$row_del_record['id']}\-'  |  grep -v 'ps -eAf'  | awk '{print $2 }') ");
 
-        $DISKS = get_disk_info();
+                    exec("rm -f /home/aces/recordings/r{$row_del_record['id']}.ts");
+                    exec("rm -f /home/aces/recordings/p{$row_del_record['id']}-*.ts");
+                    exec("rm -f /home/aces/recordings/r{$row_del_record['id']}.mkv");
+                    exec("rm -f /home/aces/recordings/r{$row_del_record['id']}.mp4");
 
-        $last_time_disk_space = time();
-    }
+                    $DB->query("DELETE FROM iptv_recording WHERE id = '{$row_del_record['id']}' ");
+                }
 
-    //DOING SERVER STATS HERE.
-    $rx[] = @file_get_contents("/sys/class/net/$net/statistics/rx_bytes");
-    $tx[] = @file_get_contents("/sys/class/net/$net/statistics/tx_bytes");
-    sleep(1);
-    clearstatcache();
-    $rx[] = @file_get_contents("/sys/class/net/$net/statistics/rx_bytes");
-    $tx[] = @file_get_contents("/sys/class/net/$net/statistics/tx_bytes");
+                $r_delrecord->free();
+            }
 
-    $tbps = (($tx[1] - $tx[0]) / 0.125);
-    $rbps = (($rx[1] - $rx[0]) / 0.125);
+            $last_time_del_record = time();
 
-    $round_rx = round($rbps / 1024000, 2);
-    $round_tx = round($tbps / 1024000, 2);
-
-    unset($rx, $tx);
-
-    $free = shell_exec('free');
-    $free = (string)trim($free);
-    $free_arr = explode("\n", $free);
-
-    $mem = explode(" ", $free_arr[1]);
-    $mem = array_filter($mem);
-    $mem = array_merge($mem);
-
-    $data = array();
-    $data['memory_usage'] = round($mem[2] / 1024, 2);
-    $data['memory_total'] = round($mem[1] / 1024, 2);
-    $data['memory_usage_percent'] = $mem[2] / $mem[1] * 100;
-    //$data['cpu_load'] = round((sys_getloadavg()[0]*100/count(sys_getloadavg())/10)  );
-    $data['cpu_load'] = exec('top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk \'{print 100 - $1}\'  ');
-    $data['tx_bandwidth'] = $round_tx;
-    $data['rx_bandwidth'] = $round_rx;
-    $data['bandwidth_usage_percent'] = (($round_rx + $round_tx) / $MAX_BANDWIDTH) * 100;
-    $data['disk_usage'] = @$disk_usage." GB";
-    $data['disk_total'] = @$disk_total." GB";
-    $data['disk_usage_percent'] = @$disk_percent;
-    $data['uptime'] = explode(' ', trim(file_get_contents('/proc/uptime')))[0];
-
-    //PING CODE
-    $ping =0;$pingResults = null;$output = null;$pingResult = null;$matches=null;
-    $cmd = sprintf('ping -w %d -%s %d %s', 3, 'c', 4, $MAIN_SERVER );
-    exec($cmd, $output, $result);
-    if($result) {
-        $pingResults = preg_grep('/time(=|<)(.*)ms/', $output); // discard output lines we don't need
-        $pingResult = array_shift($pingResults); // we wanted just one ping anyway
-        preg_match('/time(=|<)(.*)ms/', $pingResult, $matches); // we get what we want here
-        $ping = floatval(trim($matches[2])); // here's our time
-    }
-
-    if ($r00 = $DB->query("SELECT count(id) as total FROM iptv_streaming WHERE server_id = '$SERVER_ID' AND status = 1 "))
-        $data['online_channels'] = (int)$r00->fetch_assoc()['total'];
-
-    if ($r00 = $DB->query("SELECT count(id) as total FROM iptv_access WHERE server_id = '$SERVER_ID' AND device_id != 0 AND limit_time > NOW() GROUP BY device_id "))
-        $data['online_users'] = (int)$r00->num_rows;
-
-    if ($r00 = $DB->query("SELECT count(id) as total FROM iptv_access WHERE server_id = '$SERVER_ID' AND device_id != 0 AND limit_time > NOW() "))
-        $data['connections'] = (int)$r00->fetch_assoc()['total'];
+        }
 
 
-    $r = $DB->query(" SELECT stats FROM iptv_servers WHERE id = '$SERVER_ID'");
-    $stats = unserialize(mysqli_fetch_assoc($r)['stats']);
+        //GET DISK SPACE EVERY 10 MINUTES
+        if (!$last_time_disk_space || ($last_time_disk_space + (60 * 10)) < time()) {
 
-    $limit = 20;
+            $DISKS = get_disk_info();
 
-    if (is_array($cpu_history) && count($cpu_history) > $limit)
-        while (count($cpu_history) > $limit) array_shift($cpu_history);
+            $last_time_disk_space = time();
+        }
 
-    $cpu_history[] = $data['cpu_load'];
+        //DOING SERVER STATS HERE.
+        $rx[] = @file_get_contents("/sys/class/net/$net/statistics/rx_bytes");
+        $tx[] = @file_get_contents("/sys/class/net/$net/statistics/tx_bytes");
+        sleep(1);
+        clearstatcache();
+        $rx[] = @file_get_contents("/sys/class/net/$net/statistics/rx_bytes");
+        $tx[] = @file_get_contents("/sys/class/net/$net/statistics/tx_bytes");
+
+        $tbps = (($tx[1] - $tx[0]) / 0.125);
+        $rbps = (($rx[1] - $rx[0]) / 0.125);
+
+        $round_rx = round($rbps / 1024000, 2);
+        $round_tx = round($tbps / 1024000, 2);
+
+        unset($rx, $tx);
+
+        $free = shell_exec('free');
+        $free = (string)trim($free);
+        $free_arr = explode("\n", $free);
+
+        $mem = explode(" ", $free_arr[1]);
+        $mem = array_filter($mem);
+        $mem = array_merge($mem);
+
+        $data = array();
+        $data['memory_usage'] = round($mem[2] / 1024, 2);
+        $data['memory_total'] = round($mem[1] / 1024, 2);
+        $data['memory_usage_percent'] = $mem[2] / $mem[1] * 100;
+        //$data['cpu_load'] = round((sys_getloadavg()[0]*100/count(sys_getloadavg())/10)  );
+        $data['cpu_load'] = exec('top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk \'{print 100 - $1}\'  ');
+        $data['tx_bandwidth'] = $round_tx;
+        $data['rx_bandwidth'] = $round_rx;
+        $data['bandwidth_usage_percent'] = (($round_rx + $round_tx) / $MAX_BANDWIDTH) * 100;
+        $data['disk_usage'] = @$disk_usage . " GB";
+        $data['disk_total'] = @$disk_total . " GB";
+        $data['disk_usage_percent'] = @$disk_percent;
+        $data['uptime'] = explode(' ', trim(file_get_contents('/proc/uptime')))[0];
+
+        //PING CODE
+        $ping = 0;
+        $pingResults = null;
+        $output = null;
+        $pingResult = null;
+        $matches = null;
+        $cmd = sprintf('ping -w %d -%s %d %s', 3, 'c', 4, $MAIN_SERVER);
+        exec($cmd, $output, $result);
+        if ($result) {
+            $pingResults = preg_grep('/time(=|<)(.*)ms/', $output); // discard output lines we don't need
+            $pingResult = array_shift($pingResults); // we wanted just one ping anyway
+            preg_match('/time(=|<)(.*)ms/', $pingResult, $matches); // we get what we want here
+            $ping = floatval(trim($matches[2])); // here's our time
+        }
+
+        if ($r00 = $DB->query("SELECT count(id) as total FROM iptv_streaming WHERE server_id = '$SERVER_ID' AND status = 1 "))
+            $data['online_channels'] = (int)$r00->fetch_assoc()['total'];
+
+        if ($r00 = $DB->query("SELECT count(id) as total FROM iptv_access WHERE server_id = '$SERVER_ID' AND device_id != 0 AND limit_time > NOW() GROUP BY device_id "))
+            $data['online_users'] = (int)$r00->num_rows;
+
+        if ($r00 = $DB->query("SELECT count(id) as total FROM iptv_access WHERE server_id = '$SERVER_ID' AND device_id != 0 AND limit_time > NOW() "))
+            $data['connections'] = (int)$r00->fetch_assoc()['total'];
 
 
-    if (is_array($ram_history) && count($ram_history) > $limit)
-        while (count($ram_history) > $limit) array_shift($ram_history);
+        $r = $DB->query(" SELECT stats FROM iptv_servers WHERE id = '$SERVER_ID'");
+        $stats = unserialize(mysqli_fetch_assoc($r)['stats']);
+
+        $limit = 20;
+
+        if (is_array($cpu_history) && count($cpu_history) > $limit)
+            while (count($cpu_history) > $limit) array_shift($cpu_history);
+
+        $cpu_history[] = $data['cpu_load'];
+
+
+        if (is_array($ram_history) && count($ram_history) > $limit)
+            while (count($ram_history) > $limit) array_shift($ram_history);
 
         $ram_history[] = $data['memory_usage_percent'];
 
@@ -651,11 +636,23 @@ while(true) {
                 $r_srv_set->free();
             }
 
-            if(!$check_armor ||  ($check_armor + 60 ) < time() ) {
+            if (!$check_armor || ($check_armor + 60) < time()) {
                 $DB->query("DELETE FROM armor__tokens WHERE expire_time < UNIX_TIMESTAMP()");
                 $check_armor = time();
             }
         }
 
+
+    } catch (\mysqli_sql_exception $e) {
+        //QUERY FAIL.
+        error_log("DB Query Fail #" . $e->getCode() . " " . $e->getMessage() );
+        ConnectToDB();
+        if($e->getCode() == 2006 ) {
+            //MYSQL HAVE GONE AWAY. LETS RESTART STREAMS.
+            StartStreams();
+        }
     }
 
+
+
+}
