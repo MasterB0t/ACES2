@@ -471,5 +471,3 @@ $js = array (
 );
 
 
-echo json_encode($js);
-exit;

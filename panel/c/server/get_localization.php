@@ -14,8 +14,5 @@ else
 
 
 
-logfile(print_r($js, true));
-
 echo json_encode($js);
-
-
+exit;

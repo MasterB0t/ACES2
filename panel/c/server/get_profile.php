@@ -90,7 +90,7 @@ $js = [
         "lang" => "",
         "locale" => $locale,
         "city_id" => "0",
-        "status" => $account['status'] == 1 ? 0 : 1,   // 1 BLOCKED | 2 ASK LOGIN
+        "status" => $account['status'] == 1 ? 0 : 1,   // 1 BLOCKED | 2 ASK LOGIN $account['status'] == 1 ? 0 : 1
         "hd" => "1",
         "main_notify" => "1",
         "fav_itv_on" => "0",

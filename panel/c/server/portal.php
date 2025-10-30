@@ -1,6 +1,6 @@
 <?php
 
-//error_reporting(E_ERROR);
+//error_reporting(E_ALL);
 ini_set('memory_limit', '-1');
 
 if(is_file('config.php'))
