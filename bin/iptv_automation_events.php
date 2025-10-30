@@ -1,7 +1,11 @@
 <?php
 
+
+
+#require "/home/aces/panel/ACES2/init.php";
 require_once "/home/aces/panel/ACES2/DB.php";
 require_once "/home/aces/panel/ACES2/Curl.php";
+require_once "/home/aces/panel/ACES2/IPTV/StreamStats.php";
 require_once "/home/aces/panel/ACES2/IPTV/Stream.php";
 require_once "/home/aces/panel/ACES2/IPTV/XCAPI/XCAccount.php";
 require_once "/home/aces/panel/ACES2/IPTV/XCAPI/Stream.php";
@@ -11,14 +15,16 @@ require_once "/home/aces/panel/ACES2/IPTV/SMARKETS/Event.php";
 
 use ACES2\IPTV\XCAPI\XCAccount;
 
-set_time_limit(-1);
+if(!$event_id  = (int)$argv[1])
 
-#require "/home/aces/panel/ACES2/init.php";
+set_time_limit(-1);
+ini_set('error_log', "/home/aces/logs/automation_events_$event_id.log");
+error_reporting(E_ERROR | E_USER_ERROR );
 
 
 $db = new \ACES2\DB;
 
-if(!$event_id  = (int)$argv[1])
+
 error_log("Scanning Events $event_id");
 
 $r_events = $db->query("SELECT * FROM iptv_dynamic_events WHERE id = $event_id ");
@@ -40,6 +46,16 @@ while ($row = $r->fetch_assoc()) {
     $db->query("DELETE FROM iptv_stream_events WHERE stream_id = '{$row['id']}'");
     $db->query("UPDATE iptv_channels SET name = '$EVENT_TYPE : No event' $sql_hide WHERE id = '{$row['id']}'");
     $db->query("DELETE FROM iptv_epg WHERE chan_id = '{$row['id']}'");
+
+    try {
+        error_log("Stoping stream from {$row['id']}");
+        $Stream = new \ACES2\IPTV\Stream($row['id']);
+        $Stream->stop();
+    } catch (\Exception $e) {
+        $ignore =1;
+    }
+
+
 }
 
 //GETTING Smarkets Events
@@ -57,6 +73,7 @@ foreach ($Providers as $provider_id) {
         $json = $XCAccount->getLiveStreams();
 
         echo "Getting Streams From Provider $XCAccount->host\n";
+        error_log("Getting Streams From Provider $XCAccount->host\n");
 
         foreach ($json as $s) {
 
@@ -101,7 +118,10 @@ foreach ($Providers as $provider_id) {
                                     $db->query("INSERT INTO iptv_channels_sources (chan_id, priority, url, enable) 
                                     VALUES('$stream_id',1, '{$Stream->getStreamUrl()}', 1)");
 
-                                    if(!in_array($stream_id, $StreamsToRestart))
+                                    //IF THE EVENT IS LIVE WE SHOULD NOT RESTART STREAM WHEN MORE SOURCES ARE FOUNDED.
+                                    $r_live = $db->query("SELECT id FROM iptv_stream_events 
+                                        WHERE stream_id = '$stream_id' AND start_datetime  < NOW() AND end_datetime > NOW() ");
+                                    if(!in_array($stream_id, $StreamsToRestart) && $r_live->num_rows < 1 )
                                         $StreamsToRestart[] = $stream_id;
 
                                 }
@@ -154,7 +174,7 @@ foreach ($Providers as $provider_id) {
 
                                         $r_start_date = $db->query("SELECT start_datetime FROM iptv_stream_events WHERE stream_id = '{$row['id']}'");
                                         $start_datetime = $r_start_date->fetch_assoc()['start_datetime'];
-                                        $start_date = date("D H:i T", strtotime($start_datetime));
+                                        $start_date = date("D #d H:i T", strtotime($start_datetime));
 
                                         //ADDING EPG
                                         $db->query("INSERT INTO iptv_epg (chan_id,tvg_id,title,description,start_date,start_time,end_date,end_time)
@@ -211,16 +231,19 @@ foreach ($Providers as $provider_id) {
         }
 
     } catch (\Exception $e) {
+        error_log($e->getMessage());
         logE($e->getMessage());
         $ignore = true;
     }
 }
 
+
 foreach($StreamsToRestart as $stream_id) {
     try {
         $Stream = new \ACES2\IPTV\Stream($stream_id);
         echo "Restarting $Stream->id\n";
-        //$Stream->restart();
+        error_log("Restarting Stream #$stream_id\n");
+        $Stream->restart();
     } catch (\Exception $e) {
         $ignore = 1;
     }
@@ -233,5 +256,5 @@ if(count($StreamsToRestart ) > 0) {
     exec("php /home/aces/bin/iptv_build_guide.php > /dev/null &");
 }
 
-
+error_log("Finished");
 echo "\nFinished\n";
