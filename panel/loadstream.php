@@ -1,19 +1,11 @@
 <?php
 
+
 if (stripos($_SERVER['REQUEST_METHOD'], 'HEAD') !== FALSE) { exit(); }
 
 //error_reporting(0);
 
 $ADDR = $_SERVER['HTTP_HOST'];
-
-
-
-$sql_u = '';
-if(empty($_GET['token']) || !preg_match('/^[a-zA-Z0-9-]+$/',$_GET['token'])  ){  sleep(10); die; }
-if(!is_file('/home/aces/no_username')) {
-    if( empty($_GET['username']) || !preg_match('/^[a-zA-Z0-9-]+$/',$_GET['username'])  ) {  sleep(10); die; }
-    $sql_u = " AND username = '{$_GET['username']}' " ;
-}
 
 
 $ADPT = '';
@@ -42,14 +34,25 @@ require_once $_SERVER['DOCUMENT_ROOT']."/ACES2/Firewall.php";
 require_once $_SERVER['DOCUMENT_ROOT']."/ACES2/IPTV/AccountLog.php";
 
 $ACES = new mysqli($DBHOST,$DBUSER,$DBPASS,$DATABASE);
-if($ACES->connect_errno > 0) { sleep(5); sleep(5); die; }
+if($ACES->connect_errno > 0) { sleep(5);  die; }
+
+$password = $ACES->escape_string($_GET['password']);
+$username = $ACES->escape_string($_GET['username']);
+
+$sql_u = '';
+
+$sql_u = is_file('/home/aces/no_username')
+    ? " token = '$password' "
+    : " username = '$username' AND token = '$password' ";
+
+
 
 @define('DB_NAME', $DATABASE );
 @define('DB_USER', $DBUSER );
 @define('DB_PASS', $DBPASS );
 @define('DB_HOST', $DBHOST );
 
-$r=$ACES->query("SELECT id FROM iptv_streaming WHERE chan_id = '$strm_id' AND status > 0 ");
+//$r=$ACES->query("SELECT id FROM iptv_streaming WHERE chan_id = '$strm_id' AND status > 0 ");
 //if(!$r->fetch_assoc()) { sleep(5); die; }
 
 //$sql_u = $ACES->escape_string($sql_u);
@@ -58,27 +61,30 @@ $r=$ACES->query("SELECT id FROM iptv_streaming WHERE chan_id = '$strm_id' AND st
 //if(isset($_GET['mac'])) $r = $ACES->query("SELECT id,limit_connections,security_level,bouquets,status,adults,pin,adults_with_pin,lock_user_agent,ip_address,lock_ip_address,auto_ip_lock,user_agent,tmp_block,TIMESTAMPDIFF(SECOND, NOW(), subcription) as expire_in  FROM iptv_devices WHERE mag = '{$_GET['mac']}'  ");
 //if(is_file("/home/aces/no_u"))  $r = $ACES->query("SELECT id,limit_connections,security_level,bouquets,status,adults,pin,adults_with_pin,lock_user_agent,ip_address,lock_ip_address,auto_ip_lock,user_agent,tmp_block,TIMESTAMPDIFF(SECOND, NOW(), subcription) as expire_in FROM iptv_devices  WHERE token = '{$_GET['token']}' $sql_u    ");
 //else
-$r = $ACES->query("SELECT id,limit_connections,ignore_block_rules,bouquets,status,adults,pin,adults_with_pin,lock_user_agent,ip_address,lock_ip_address,auto_ip_lock,user_agent,tmp_block,TIMESTAMPDIFF(SECOND, NOW(), subcription) as expire_in FROM iptv_devices  WHERE token = '{$_GET['token']}' $sql_u    ");
 
+
+$r = $ACES->query("SELECT id,limit_connections,ignore_block_rules,bouquets,status,adults,pin,adults_with_pin,
+       lock_user_agent,ip_address,lock_ip_address,auto_ip_lock,user_agent,tmp_block
+       ,TIMESTAMPDIFF(SECOND, NOW(), subcription) as expire_in 
+    FROM iptv_devices 
+    WHERE $sql_u    ");
 
 
 if($DEVICE = $r->fetch_assoc()) {
 
     $UserAgent = $ACES->real_escape_string($_SERVER['HTTP_USER_AGENT']);
 
-
     //ACCOUNT IS EXPIRED.
     if($DEVICE['expire_in'] < 1) {
         sleep(5);die;
     }
-
 
     $DEVICE_ID  = $DEVICE['id'];
     $LIMIT_CONNECTION = $DEVICE ['limit_connections'];
     if(empty($LIMIT_CONNECTION)) $LIMIT_CONNECTION = 1;
 
     //DEVICE IS DISABLED OR BLOCK
-    if($DEVICE['status'] > 1 ) { sleep(30); die; }
+    if($DEVICE['status'] > 1 ) { sleep(5); die; }
 
 
     if($DEVICE['lock_ip_address']) {
@@ -135,7 +141,7 @@ if($DEVICE = $r->fetch_assoc()) {
     }
 
 //TODO: ADD HERE IPTV_STREAMS BLOCK
-} else{
+} else {
 
     $Armor = new \ACES2\ARMOR\Armor();
     $Armor->log_ban("iptv-account");
