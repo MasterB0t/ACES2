@@ -130,7 +130,7 @@ switch($_REQUEST['action']) {
 
     case 'scan':
         $event_id = (int)$_REQUEST['event_id'];
-        exec("php /home/aces/bin/iptv_dynamic_events.php $event_id > /dev/null &");
+        exec("php /home/aces/bin/iptv_automation_events.php $event_id > /dev/null &");
         break;
 
 
