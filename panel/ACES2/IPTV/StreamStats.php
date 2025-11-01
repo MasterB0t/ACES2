@@ -24,7 +24,7 @@ class StreamStats {
                        WHERE stream_id=" . $this->stream_id . " AND server_id=" . $this->server_id);
         if($row=$r->fetch_assoc()) {
             $this->status = $row['type'];
-            $this->stream_url = $row['source_url'];
+            $this->streaming_url = $row['source_url'];
         }
 
         $db->close();
