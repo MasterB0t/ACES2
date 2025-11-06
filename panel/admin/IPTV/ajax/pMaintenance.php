@@ -32,6 +32,8 @@ function clearStreams() {
     $db->query("TRUNCATE iptv_channel_files");
     $db->query("TRUNCATE iptv_stream_options");
     $db->query("TRUNCATE iptv_package_channels");
+    $db->query("TRUNCATE iptv_stream_events ");
+    $db->query("TRUNCATE iptv_dynamic_events ");
 
     $db->query("INSERT INTO iptv_stream_options (name,video_codec,audio_codec,segment_time,segment_list_files,segment_wrap) 
             VALUES ('Stream','copy','copy','10','6','6')");
@@ -104,6 +106,7 @@ switch(strtoupper($_REQUEST['action'])) {
         $db->query("TRUNCATE iptv_packages");
         $db->query("TRUNCATE iptv_plex_accounts");
         $db->query("TRUNCATE iptv_proccess");
+        $db->query("TRUNCATE process");
         $db->query("TRUNCATE iptv_streaming");
         $db->query("TRUNCATE iptv_recording");
         $db->query("TRUNCATE iptv_stream_categories");
@@ -115,6 +118,9 @@ switch(strtoupper($_REQUEST['action'])) {
         $db->query("TRUNCATE iptv_devices");
         $db->query("TRUNCATE iptv_mag_devices");
         $db->query("TRUNCATE iptv_mag_event");
+
+        $db->query("INSERT INTO iptv_stream_categories (name) VALUES ('Streams')");
+        $db->query("INSERT INTO iptv_bouquets (name) VALUES ('All')");
 
         break;
 
