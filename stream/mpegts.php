@@ -139,7 +139,7 @@ if($DB->connect_errno > 0){ die(); }
 
 
 $r=$DB->query("SELECT id,device_id FROM iptv_access WHERE id=$ACCESS_ID
-                                       AND token='$TOKEN' AND chan_id = '$STREAM_ID' AND limit_time > NOW()  ");
+                                       AND token='$TOKEN' AND chan_id = $STREAM_ID AND limit_time > NOW()  ");
 if(!$row=$r->fetch_assoc())
     die;
 $DEVICE_ID=$row['id'];

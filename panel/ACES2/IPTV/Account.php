@@ -327,7 +327,7 @@ class Account {
         $this->admin_notes = $db->escString($POST['admin_notes']);
         $this->limit_connections = (int)$POST['limit_connections'];
 
-        //$this->no_series_club = $POST['no_series_club'] ? 1 : 0;
+        //$this->no_series_club 0= $POST['no_series_club'] ? 1 : 0;
         //$extra_opts = serialize($extra_opts);
 
         $this->locked_ip = ( is_array($POST['allowed_ip_address']) && count($POST['allowed_ip_address']) > 0 );

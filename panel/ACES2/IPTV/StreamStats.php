@@ -39,7 +39,7 @@ class StreamStats {
             return;
 
         $db->query("UPDATE iptv_stream_stats SET last_time = unix_timestamp() - log_time
-             WHERE stream_id = '$this->stream_id' AND server_id = '$this->server_id' 
+             WHERE stream_id = $this->stream_id AND server_id = $this->server_id
              ORDER BY log_time DESC LIMIT 1");
 
         $db->query("INSERT INTO iptv_stream_stats (stream_id, server_id, type, log_time, source_url) 

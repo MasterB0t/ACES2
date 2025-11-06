@@ -83,7 +83,8 @@ if($TYPE == 'm3u8') {
         if($DB->connect_errno > 0){ die(); }
 
         //$r=$DB->query("SELECT id,message FROM iptv_access WHERE id=$ACCESS_ID AND token='$token' AND chan_id = $CHANID AND limit_time > NOW() AND  ip_address = '{$_SERVER['REMOTE_ADDR']}' ");
-        $r=$DB->query("SELECT id,message FROM iptv_access WHERE id=$ACCESS_ID AND token='$token' AND chan_id = $CHANID AND limit_time > NOW() ");
+        $r=$DB->query("SELECT id,message FROM iptv_access 
+                  WHERE id=$ACCESS_ID AND token='$token' AND chan_id = $CHANID AND limit_time > NOW() ");
 
         if(!($row=$r->fetch_assoc())) die;
 
