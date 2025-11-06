@@ -45,23 +45,30 @@ if($EditID= (int)$_REQUEST['id']) {
     if($Account->mac_address && $Account->allow_mag ) {
         $MagDevice = new \ACES2\IPTV\MagDevice($EditID);
 
-        $sql_bouquets  = implode(",",$Account->bouquets);
+        $Streams = [];$Videos = [];
+        if(count($Account->bouquets) > 0) {
+            $sql_bouquets = implode(",",$Account->bouquets);
 
-        $r_videos = $db->query("SELECT v.id,v.name FROM iptv_ondemand_in_bouquet b 
+            $r_videos = $db->query("SELECT v.id,v.name FROM iptv_ondemand_in_bouquet b 
             RIGHT JOIN iptv_ondemand v ON v.id = b.video_id
             WHERE b.bouquet_id IN ($sql_bouquets) 
             GROUP BY v.id  ");
+            $Videos = $r_videos->fetch_all(MYSQLI_ASSOC);
 
-        $r_streams = $db->query("SELECT c.id,c.name FROM iptv_channels_in_bouquet b 
+            $r_streams = $db->query("SELECT c.id,c.name FROM iptv_channels_in_bouquet b 
             RIGHT JOIN iptv_channels c ON c.id = b.chan_id
             WHERE b.bouquet_id IN ($sql_bouquets) 
             GROUP BY c.id  ");
+            $Streams = $r_streams->fetch_all(MYSQLI_ASSOC);
+
+        }
+
     }
 
 
 }
 
-
+$a =10;
 
 ?><!DOCTYPE html>
 <html lang="en">
@@ -285,7 +292,7 @@ if($EditID= (int)$_REQUEST['id']) {
                                                 <div class="form-group">
                                                     <label>Stream Format</label>
                                                     <select name="stream_format" class="form-control select2">
-                                                        <option selected value="ts">TS</option>
+                                                        <option value="ts">TS</option>
                                                         <option value="m3u8">HLS</option>
                                                     </select>
                                                 </div>
@@ -306,7 +313,7 @@ if($EditID= (int)$_REQUEST['id']) {
                                                         <div class="form-group">
                                                             <h5>Favorites Streams</h5>
                                                             <select multiple name="favorites_streams[]" class="form-control select2">
-                                                                <?php while($o=$r_streams->fetch_assoc()) {
+                                                                <?php foreach($Streams as $o) {
                                                                     $s = in_array($o['id'],$MagDevice->favorite_streams) ? 'selected' : '';
                                                                     ?>
                                                                     <option
@@ -320,7 +327,7 @@ if($EditID= (int)$_REQUEST['id']) {
                                                         <div class="form-group">
                                                             <h5>Favorites Videos</h5>
                                                             <select multiple name="favorites_videos[]" class="form-control select2">
-                                                                <?php while($o=$r_videos->fetch_assoc()) {
+                                                                <?php foreach($Videos as $o) {
                                                                     $s = in_array($o['id'],$MagDevice->favorite_videos) ? 'selected' : '';
                                                                     ?>
                                                                     <option
@@ -400,6 +407,7 @@ if($EditID= (int)$_REQUEST['id']) {
 
     <?php if($EditID= (int)$_REQUEST['id']) { ?>
         $("input[name='status']").prop('checked', <?=$Account->status == $Account::STATUS_DISABLED ? 'false' : 'true'?>);
+        $("select[name='stream_format']").val('<?=$MagDevice->stream_format?>');
     <?php } ?>
     function genRandomStr(obj) {
         chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
