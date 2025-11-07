@@ -48,9 +48,6 @@ if(isset($_GET['filter_video_type'])) {
     };
 }
 
-
-
-
 $filter_sql = implode(" AND ", $filters);
 
 $search = "";
@@ -58,8 +55,9 @@ if(!empty($_GET['search']['value'])) {
 
     $s = $DB->escString($_GET['search']['value']);
 
-    $search = " r.name LIKE '%$s%' AND $filter_sql ";
-    
+    $search = " o.name LIKE '%$s%' AND $filter_sql ";
+    $search .= " OR e.title LIKE '%$s%' AND $filter_sql ";
+
     if(is_numeric($_GET['search']['value']))
         $search .= " OR r.id LIKE '%$s%' AND $filter_sql ";
 
@@ -86,12 +84,16 @@ $json['recordsTotal'] = $r->num_rows;
 
 $r=$DB->query("SELECT r.file_id FROM iptv_video_reports r
     INNER JOIN iptv_video_files f ON f.id = r.file_id
+    LEFT JOIN iptv_ondemand o ON o.id = f.movie_id
+    LEFT JOIN iptv_series_season_episodes e ON e.id = f.episode_id
  $Where GROUP BY r.file_id ");
 $json['recordsFiltered'] = $r->num_rows;
 
 $r=$DB->query("SELECT r.*, f.movie_id,f.episode_id,f.server_id,f.source_file,s.name as server_name
     FROM iptv_video_reports r
     INNER JOIN iptv_video_files f ON f.id = r.file_id
+    LEFT JOIN iptv_ondemand o ON o.id = f.movie_id
+    LEFT JOIN iptv_series_season_episodes e ON e.id = f.episode_id
     LEFT JOIN iptv_servers s ON s.id = f.server_id
 
 
