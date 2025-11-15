@@ -185,6 +185,8 @@ class Account {
             }
         }
 
+        $this->db->query("UPDATE iptv_devices SET lock_user_agent = '$this->locked_user_agent' WHERE id = '$this->id' ");
+
     }
     public function setIpLocks(Array $ip_locks){
 
@@ -197,6 +199,8 @@ class Account {
             }
 
         }
+
+        $this->db->query("UPDATE iptv_devices SET lock_ip_address = '$this->locked_ip' WHERE id = '$this->id' ");
     }
     public function setPin(String $pin){
         if (!preg_match('/^[0-9]{4}+$/', $pin))
